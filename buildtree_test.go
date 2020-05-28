@@ -252,7 +252,7 @@ func TestBuildTreeEdgeCases(t *testing.T) {
 		t.Errorf("With Unicode string in tree, Contains should return true for it")
 	}
 	if tree.nodeCount != 25 {
-		t.Errorf("Node count should be exactly 9, but was %d", tree.nodeCount)
+		t.Errorf("Node count should be exactly 25, but was %d", tree.nodeCount)
 	}
 }
 
