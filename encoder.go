@@ -33,7 +33,10 @@ func (e *Encoder) Encode(t *BuildTree) ([]byte, error) {
 	}
 	e.curOffset = e.getChildNodesSizeTotal(data, t.Root.Edges) + int(data[1]+1+1)
 
-	data = e.encodeEdges(t.Root, data)
+	data, err := e.encodeEdges(t.Root, data)
+	if err != nil {
+		return nil, err
+	}
 
 	for len(e.queue) > 0 {
 		// Pop first item off the queue
@@ -41,7 +44,10 @@ func (e *Encoder) Encode(t *BuildTree) ([]byte, error) {
 		e.queue = e.queue[1:]
 
 		// Recursively marshal child nodes
-		data = e.encodeEdges(top, data)
+		data, err = e.encodeEdges(top, data)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return data, nil
@@ -78,7 +84,7 @@ func (e *Encoder) getChildNodesSizeTotal(data []byte, childNodes map[rune]*Build
 
 // encodeEdges encodes the edges going out of node into bytes which are appended
 // to data. The modified byte slice is returned.
-func (e *Encoder) encodeEdges(node *BuildTreeNode, data []byte) []byte {
+func (e *Encoder) encodeEdges(node *BuildTreeNode, data []byte) ([]byte, error) {
 	// We want deterministic output for testing purposes,
 	// so we need to order the keys of the edges map.
 	edgeKeys := sortEdgeKeys(node)
@@ -103,8 +109,7 @@ func (e *Encoder) encodeEdges(node *BuildTreeNode, data []byte) []byte {
 		entryBytes := make([]byte, runelen+1+int(data[1]))
 		ret := copy(entryBytes, append([]byte{flags}, []byte(string(currune))...))
 		if ret != runelen+1 {
-			fmt.Printf("Could not copy UTF-8 bytes + flag. Wanted to copy %d, but only copied %d\n", runelen, ret)
-			return nil
+			return nil, fmt.Errorf("could not copy UTF-8 bytes + flag. Wanted to copy %d, but only copied %d\n", runelen, ret)
 		}
 
 		// If bytePos is 0, we haven't encoded this edge yet
@@ -131,7 +136,7 @@ func (e *Encoder) encodeEdges(node *BuildTreeNode, data []byte) []byte {
 		data = append(data, entryBytes...)
 	}
 
-	return data
+	return data, nil
 }
 
 // sortEdgeKeys returns a sorted list of the keys
