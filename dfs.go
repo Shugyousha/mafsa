@@ -15,17 +15,17 @@ func newDepthFirst(tree *MinTree) *depthFirst {
 	}
 }
 
-func (this *depthFirst) start() {
-	this.search(this.tree.Root, "")
-	close(this.channel)
+func (df *depthFirst) start() {
+	df.search(df.tree.Root, "")
+	close(df.channel)
 }
 
-func (this *depthFirst) search(node *MinTreeNode, word string) {
+func (df *depthFirst) search(node *MinTreeNode, word string) {
 	if node.Final {
-		this.channel <- string(word)
+		df.channel <- string(word)
 	} else {
 		for _, char := range sortKeys(node.Edges) {
-			this.search(node.Edges[char], word+string(char))
+			df.search(node.Edges[char], word+string(char))
 		}
 	}
 }
