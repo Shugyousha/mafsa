@@ -296,16 +296,15 @@ func minTreeFromWordList(t *testing.T, words []string) *MinTree {
 // with no considereation for optimization or
 // putting numbers on the nodes. For testing only.
 func minTreeLazyInsert(t *MinTree, word string) {
-	wordRunes := []rune(word)
 	node := t.Root
-	for _, char := range wordRunes {
-		if child, ok := node.Edges[char]; ok {
+	for _, r := range word {
+		if child, ok := node.Edges[r]; ok {
 			node = child
 		} else {
-			node.Edges[char] = &MinTreeNode{
+			node.Edges[r] = &MinTreeNode{
 				Edges: make(map[rune]*MinTreeNode),
 			}
-			node = node.Edges[char]
+			node = node.Edges[r]
 		}
 	}
 	node.Final = true
