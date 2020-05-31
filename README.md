@@ -89,58 +89,73 @@ There are many ways to apply MA-FSA with minimal perfect hashing, so the package
 
 This section describes the file format used by `Encoder` and `Decoder`. You probably will never need to implement this yourself; it's already done for you in this package.
 
-BuildTrees can be encoded as bytes and then stored on disk or decoded into a MinTree. The encoding of a BuildTree is a binary file that is composed of a sequence of words, which is a sequence of big-endian bytes. Each word is the same length. The file is inspected one word at a time.
+BuildTrees can be encoded as bytes and then stored on disk or decoded into a MinTree. The encoding of a BuildTree is a binary file that is composed of a sequence of words, which is a sequence of big-endian bytes. The file is inspected one word at a time.
 
-The first word contains file format information. Byte 0 is the file version (right now, 1). Byte 1 is the word length. Byte 2 is the character length. Byte 3 is the pointer length. The rest of the bytes of the first word are 0s.
+The word length is equal to (in bytes): 1 (the flag byte) + character length (UTF-8 encoding of the unicode point) + pointer length (byte 1 in the header).
 
-The word length must be at least 4, and must equal Byte 2 + Byte 3 + 1 (for the flag byte).
+The first word contains file format information. Byte 0 is the file version (right now, 2). Byte 1 is the pointer length. In the first word specifying the file format, we assume a character lenght of 1 and fill up the rest of the bytes with zeros bytes.
 
-Package smartystreets/mafsa initializes the file with this word:
+Package Shugyousha/mafsa initializes the file with this first word entry by default:
 
-    []byte{0x01 0x06 0x01 0x04 0x00 0x00}
+    []byte{0x02 0x04 0x00 0x00 0x00 0x00}
 
-This indicates that using version 1 of the file format, each word is 6 bytes long, each character is 1 byte, and each pointer to another node is 4 bytes. This pointer size allows us to encode trees with up to 2^32 (a little over 4.2 billion) edges.
+This indicates that we are using version 2 of the file format and each pointer to another node is 4 bytes. This pointer size allows us to encode trees with up to 715.8 Mio. edges. The rest of the first entry are filled with zero bytes until the minimal size of a word has been reached (the pointer size takes the position of the UTF-8-character in a regular word).
 
 Every other word in the file represents an edge (not a node). Those words consist of bytes according to this format:
 
-    [Character] [Flags] [Pointer]
+    [flag byte] [UTF-8-encoded character] [pointer]
 
-The length of the character and pointer bytes are specified in the initial word, and the flags part is always a single byte. This allows us to have 8 flags per edge, but currently only 2 are used.
+The length of the character is encoded in the bits 2-4 (zero-indexed from the least significant one) of the flags, the pointer size in bytes is specified in the second byte of the initial word, and the flags part is always a single byte. This allows us to have 8 flags per edge, but currently only 5 are used.
 
-Flags are:
+The flag bits are:
 
 - `0x01` = End of Word (EOW, or final)
 - `0x02` = End of Node (EON)
+- `0x04` = lsb of character length (three bits in total)
+- `0x08` = middle bit of character length (three bits in total)
+- `0x10` = msb of character length (three bits in total)
 
-A node essentially consists of a consecutive, variable-length sequence of words, where each word represents an edge. To encode a node, write each edge sequentially. Set the final (EOW) flag if the node it points to is a final node, and set the EON flag if it is the last edge for that node. The EON flag indicates the next word is an edge belonging to a different node. The pointer in each word should be the *word* index of the start of the node being pointed to.
+A node essentially consists of a consecutive, variable-length sequence of words, where each word represents an edge. To encode a node, write each edge sequentially. Set the final (EOW) flag if the node it points to is a final node, and set the EON flag if it is the last edge for that node. The EON flag indicates the next word is an edge belonging to a different node. The pointer in each word should be the *byte* index of the start of the node being pointed to.
 
 For example, the tree containing these words:
 
-- cities
-- city
-- pities
-- pity
+-- dog
+-- dogs
+-- hello
+-- jello
+-- été
+-- あello
 
-Encodes to:
+Encodes to (each line is one word, note that they are varying in size depending on the UTF-8 encoding length of the character):
 
-    0   01 06 0104 0000
-    1   63 00 0000 0003
-    2   70 02 0000 0004
-    3   69 02 0000 0005
-    4   69 02 0000 0005
-    5   74 02 0000 0006
-    6   69 00 0000 0008
-    7   79 03 0000 0000
-    8   65 02 0000 0009
-    9   73 03 0000 0000
+ 1   02 04 00 00 00 00
+ 2   04 64 00 00 00 27
+ 3   04 68 00 00 00 2d
+ 4   04 6a 00 00 00 33
+ 5   08 c3 a9 00 00 00 39
+ 6   0e e3 81 82 00 00 00 3f
+ 7   06 6f 00 00 00 45
+ 8   06 65 00 00 00 4b
+ 9   06 65 00 00 00 4b
+10   06 74 00 00 00 51
+11   06 65 00 00 00 4b
+12   07 67 00 00 00 58
+13   06 6c 00 00 00 5e
+14   0b c3 a9 00 00 00 00
+15   07 73 00 00 00 00
+16   06 6c 00 00 00 64
+17   07 6f 00 00 00 00
 
-Or here's the hexdump:
+Or here's the hexdump (this makes it easier to follow the byte offsets):
 
-    00000000  01 06 01 04 00 00 63 00  00 00 00 03 70 02 00 00  |......c.....p...|
-    00000010  00 04 69 02 00 00 00 05  69 02 00 00 00 05 74 02  |..i.....i.....t.|
-    00000020  00 00 00 06 69 00 00 00  00 08 79 03 00 00 00 00  |....i.....y.....|
-    00000030  65 02 00 00 00 09 73 03  00 00 00 00              |e.....s.....|
+00000000: 0204 0000 0000 0464 0000 0027 0468 0000  .......d...'.h..
+00000010: 002d 046a 0000 0033 08c3 a900 0000 390e  .-.j...3......9.
+00000020: e381 8200 0000 3f06 6f00 0000 4506 6500  ......?.o...E.e.
+00000030: 0000 4b06 6500 0000 4b06 7400 0000 5106  ..K.e...K.t...Q.
+00000040: 6500 0000 4b07 6700 0000 5806 6c00 0000  e...K.g...X.l...
+00000050: 5e0b c3a9 0000 0000 0773 0000 0000 066c  ^........s.....l
+00000060: 0000 0064 076f 0000 0000                 ...d.o....
 
-Now, this tree isn't a thorough-enough example to test your implementation against, but it should illustrate the idea. First notice that the first word is the initializer word. The second word is the first edge coming off the root node, and words 1 and 2 are both edges coming off the root node. The word at 2 has the EON flag set (0x02) which indicates the end of the edges coming off that node. You'll see that edges at word indices 3 and 4 both point to the node starting at edge with word index 5. That would be the shared 't' node after 'ci' and 'pi'.
+Now, this tree isn't a thorough-enough example to test your implementation against, but it should illustrate the idea. First notice that the first word is the initializer word. The second word is the first edge coming off the root node, and words 3 and 4 are both edges coming off the root node. The word at 6 has the EON flag set (0x02) which indicates the end of the edges coming off that node (the root node). You'll see that edges at word indices 8 and 9 both point to the node starting at edge with word index 16 (at byte offset 0x4b, 75 in decimal). That would be the shared 'l' node after 'he' and 'je'.
 
 If a node has no outgoing edges, the pointer bits are 0.
