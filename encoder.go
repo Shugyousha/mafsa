@@ -101,11 +101,13 @@ func (e *Encoder) encodeEdges(node *BuildTreeNode, data []byte) ([]byte, error) 
 		if i == len(edgeKeys)-1 {
 			flags |= endOfNode // end of node (last child outgoing from this node)
 		}
-		// encode rune length in the bits after the first two least significant ones
+		// encode rune length in the bits after the first two
+		// least significant ones
 		lenmask := byte(runelen) << 2
 		flags |= lenmask
 
-		// the whole entry fits in here. The size is: length of rune + flag + pointer size
+		// the whole entry fits in here. The size is: flag +
+		// length of rune + pointer size
 		entryBytes := make([]byte, runelen+1+int(data[1]))
 		ret := copy(entryBytes, append([]byte{flags}, []byte(string(currune))...))
 		if ret != runelen+1 {
