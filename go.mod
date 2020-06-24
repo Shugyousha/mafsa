@@ -1,3 +1,3 @@
-module github.com/smartystreets/mafsa
+module github.com/Shugyousha/mafsa
 
 go 1.12
